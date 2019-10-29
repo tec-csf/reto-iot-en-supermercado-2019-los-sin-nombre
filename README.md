@@ -7,8 +7,6 @@
 2. Luis Rodrigo Montúfar Pérez - A01273078 - Hidalgo
 3. Carlos Colín Negrete - A01019975 - CSF
 4. Cesar Lorenzo - *[Poner aquí su Matrícula]* - CSF
-5. *[Poner aquí Nombre y Apellidos del integrante 5]* - *[Poner aquí su Matrícula]* - *[Poner aquí su campus]*
-
 ---
 ## 1. Aspectos generales
 
