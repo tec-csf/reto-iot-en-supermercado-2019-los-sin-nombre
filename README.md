@@ -6,7 +6,7 @@
 1. Diego Gerardo Navarro González - A01338941 - CCM
 2. Luis Rodrigo Montúfar Pérez - A01273078 - Hidalgo
 3. Carlos Colín Negrete - A01019975 - CSF
-4. Cesar Lorenzo - *[Poner aquí su Matrícula]* - CSF
+4. Cesar Lorenzo - A01019975 - CSF
 ---
 ## 1. Aspectos generales
 
