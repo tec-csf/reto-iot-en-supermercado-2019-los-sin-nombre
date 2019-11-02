@@ -55,7 +55,7 @@ Como parte de la entrega final del reto, se debe incluir la siguiente informaci�
 
 ## 2. Descripción del proyecto
 
-*[Incluya aquí la descripción del proyecto seleccionado.]*
+Este proyecto consiste en generar un refrigerador con diferentes sensores, para simular los refrigeradores de tiendas comerciales. Estos refrigeradores contaran con sensores para detectar el estado actual del refrigerador. El refrigerador también contara con un sensor para detectar si el usuario sacó un producto del refri para poder cobrarlo.
 
 ## 3. Solución
 
