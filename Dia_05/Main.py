@@ -6,10 +6,8 @@ import requests
 import Adafruit_DHT
 from pprint import pprint
 import sys
-import datetime
-import jwt
-import paho.mqtt.client as mqtt
-import random
+import time
+from Buzzer import Buzzer
 from Proximity import Proximity
 from Presion import Presion
 from puerta import Puerta
@@ -19,19 +17,29 @@ from RF import RF
 from WR import WR
 import json
 
-#RF.readTag()
-#WR.read_Write()
+#imports para cloud
+import datetime
+import time
+import jwt
+import paho.mqtt.client as mqtt
+import random
 
-
-ssl_private_key_filepath = '/Users/vcubells/Developer/iot/iot_supermercado/demo_05/demo_private.pem'
+#variables para cloud
+ssl_private_key_filepath = '/home/pi/Documents/IOT/iot_supermercado/demo_05/demo_private.pem'
 ssl_algorithm = 'RS256'  # Either RS256 or ES256
-root_cert_filepath = '/Users/vcubells/Developer/iot/iot_supermercado/demo_05/roots.pem'
-project_id = 'test-vcn-249912'
+root_cert_filepath = '/home/pi/Documents/IOT/iot_supermercado/demo_05/roots.pem'
+project_id = 'iot-semanai'
 gcp_location = 'us-central1'
-registry_id = 'semana-i'
-device_id = 'rpi'
+registry_Fridge = 'Fridge_IoT'
+registry_Client = 'Client_Info'
+device_id = 'Rasp'
 
+sensor_temp = Adafruit_DHT.DHT11
+
+#cloud get current time
 cur_time = datetime.datetime.utcnow()
+
+#generate connection with cloud
 
 def create_jwt():
     token = {
@@ -46,16 +54,12 @@ def create_jwt():
     return jwt.encode(token, private_key, ssl_algorithm)
 
 
-_CLIENT_ID = 'projects/{}/locations/{}/registries/{}/devices/{}'.format(
-    project_id, gcp_location, registry_id, device_id)
-_MQTT_TOPIC = '/devices/{}/events'.format(device_id)
+# _CLIENT_ID = 'projects/{}/locations/{}/registries/{}/devices/{}'.format(
+#     project_id, gcp_location, registry_id, device_id)
+# _MQTT_TOPIC = '/devices/{}/events'.format(device_id)
 
-client = mqtt.Client(client_id=_CLIENT_ID)
+# client = mqtt.Client(client_id=_CLIENT_ID)
 # authorization is handled purely with JWT, no user/pass, so username can be whatever
-client.username_pw_set(
-    username='unused',
-    password=create_jwt())
-
 
 def error_str(rc):
     return '{}: {}'.format(rc, mqtt.error_string(rc))
@@ -69,14 +73,25 @@ def on_publish(unused_client, unused_userdata, unused_mid):
     print('on_publish')
 
 
-client.on_connect = on_connect
-client.on_publish = on_publish
+# client.on_connect = on_connect
+# client.on_publish = on_publish
+# 
+# # Replace this with 3rd party cert if that was used when creating registry
+# client.tls_set(ca_certs=root_cert_filepath)
+# client.connect('mqtt.googleapis.com', 443)  
+# client.loop_start()
 
-# Replace this with 3rd party cert if that was used when creating registry
-client.tls_set(ca_certs=root_cert_filepath)
-client.connect('mqtt.googleapis.com', 443)
-client.loop_start()
 
+### DECLARAMOS LOS PINES FISICOS DE CADA OBJETO
+buzzer_pin = 13
+temp_pin = 22
+flash_pin = 12
+puerta_pin = 11
+trigger_pin = 3
+echo_pin = 5
+
+#RF.readTag()
+#WR.read_Write()
 def readADC():
     adc = ADC([0])
     return adc.read_addresses()
@@ -103,11 +118,9 @@ def binaryToTemperature(num):
     vol = b * 6 / 255
     temperature = vol * 150 / 6
     return temperature
+
 def temp():
-    sensor = Adafruit_DHT.DHT11
-    pin=22
-    humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
-    
+    humidity, temperature = Adafruit_DHT.read_retry(sensor_temp, temp_pin)
     if humidity is not None and temperature is not None:
         return {'temperature': temperature, 'humidity':humidity}
         #print('Temp={0:0.1f}°C  Humidity={1:0.1f}%'.format(temperature, humidity))
@@ -121,9 +134,27 @@ def get_data_dict(adc_inputs):
     data_dict.update(temp())
     _, adc_dict = adc.read_addresses()
     data_dict.update(adc_dict)
-    ultrasonic = Ultrasonic(trigger=3, echo=5)
-    data_dict.update(ultrasonic.read_distance())
+    ultrasonic = Ultrasonic(trigger=trigger_pin, echo=echo_pin)
+    u_distance = ultrasonic.read_distance()
+    
+    if u_distance['u_distance'] <= 20:
+        turn_camera_flash(True)
+    else:
+        turn_camera_flash(False)
+    
+    data_dict.update(u_distance)
     return data_dict
+
+def turn_camera_flash(on_off):
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BOARD)
+    
+    GPIO.setup(flash_pin, GPIO.OUT)
+    
+    if on_off:
+        GPIO.output(flash_pin, GPIO.HIGH)
+    else:
+        GPIO.output(flash_pin, GPIO.LOW)
 
 def get_time_dict():
     return {'ts': int(time.time())}
@@ -141,7 +172,6 @@ def captureInfoCam():
         data = f.read()
         
     headers = { "Content-Type": "application/octet-stream" ,'Ocp-Apim-Subscription-Key': '7e9cfbb244204fb994babd6111235269'}
-    
     try:
         response = requests.post(face_uri, headers=headers, data=data)
         faces = response.json()
@@ -151,9 +181,12 @@ def captureInfoCam():
         gender = faces['faces'][0].get('gender')
         
         datosUsuario = [age, gender]
+        return datosUsuario
     except requests.exceptions.ConnectionError:
         return None
     except IndexError:
+        buzzer=Buzzer(13)
+        buzzer.buzz(seconds=0.5)
         return None
     else:
         return datosUsuario
@@ -170,7 +203,7 @@ def get_tag_info():
         
         return {'ts': timest, 'product_id': t_id, 'type_id': nameP ,'gender': datos[1], 'age': datos[0]}
 
-puerta = Puerta(7)
+puerta = Puerta( puerta_pin )
 
 while True:
     
@@ -182,13 +215,12 @@ while True:
     if puerta.read_door():
         print("Puerta cerrada: ", end='')
         print(get_data_dict( adc_inputs ))
-        #client.publish(_MQTT_TOPIC, get_data_dict( adc_inputs ), qos=1)
+        #client.username_pw_set(username='unused', password=create_jwt(registry_Fridge))
+
     else:
         print("Puerta abierta: ", end='')
         print(get_tag_info())
-        #client.publish(_MQTT_TOPIC, get_tag_info(), qos=1)
+        #client.username_pw_set(username='unused', password=create_jwt(registry_Client))
         
-
-#
     
     
